@@ -1,0 +1,8 @@
+controller:
+  name: KoolPodManager
+  enqueue: ratelimiting # or normal, delay
+  
+  resources:
+  - group: github.com/FlyingOnion/kool
+    version: v1alpha1
+    kind: KoolPod

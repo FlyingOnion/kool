@@ -1,0 +1,61 @@
+package main
+
+import (
+	"context"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/FlyingOnion/kool"
+	"github.com/spf13/pflag"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog/v2"
+)
+
+func mustGetOrLogFatal[T any](v T, err error) T {
+	if err != nil {
+		klog.Fatal(err)
+	}
+	return v
+}
+
+func main() {
+	var kubeconfig string
+	var master string
+
+	pflag.StringVar(&kubeconfig, "kubeconfig", "", "absolute path to the kubeconfig file")
+	pflag.StringVar(&master, "master", "", "master url")
+	pflag.Parse()
+
+	config := mustGetOrLogFatal(clientcmd.BuildConfigFromFlags(master, kubeconfig))
+	client := mustGetOrLogFatal(rest.RESTClientFor(config))
+	
+	{{ range .Resources }}
+	{{ if .Namespace }}
+	{{- lower .Kind }}Informer := 
+	{{ else }}
+	{{- lower .Kind }}Informer := kool.NewInformer[{{ .Kind }}](client, 30*time.Second)
+	{{ end }}
+	{{ end }}
+	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+
+	controller := New{{ .Name }}({{ range .Resources }}{{ lower .Kind }}Informer, {{ end }}queue, {{ .Retry }})
+
+	sigC := make(chan os.Signal, 1)
+	signal.Notify(sigC, syscall.SIGINT, syscall.SIGTERM)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go controller.Run(ctx, 1)
+
+	select {
+	case sig := <-sigC:
+		klog.Infof("Received signal: %s", sig)
+		signal.Stop(sigC)
+		cancel()
+	case <-ctx.Done():
+	}
+}

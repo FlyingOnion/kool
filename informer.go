@@ -2,11 +2,14 @@ package kool
 
 import (
 	"context"
+	"reflect"
+	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -15,24 +18,62 @@ type Informer[T any] interface {
 	Lister() Lister[T]
 }
 
-func New() {
-	var scheme *runtime.Scheme
-	scheme.KnownTypes()
+type informer[T any] struct {
+	client       Client[T]
+	resyncPeriod time.Duration
+	// obj is used to initialize SharedIndexInformer
+	obj runtime.Object
 }
 
-func NewFilteredInformer[T any](client Client[T], ns string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	obj := mustBeRuntimeObject(new(T))
+func (m *informer[T]) Informer() cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return client.List(context.TODO(), options)
+				return m.client.List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return client.Watch(context.TODO(), options)
+				return m.client.Watch(context.TODO(), options)
 			},
 		},
-		obj,
-		resyncPeriod,
+		m.obj,
+		m.resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
+	// return NewFilteredInformer[T](
+	// 	m.client,
+	// 	m.resyncPeriod,
+	// 	cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+	// )
 }
+
+func (m *informer[T]) Lister() Lister[T] {
+	return NewLister[T](m.Informer().GetIndexer())
+}
+
+func NewInformer[T any](client *rest.RESTClient, resyncPeriod time.Duration) Informer[T] {
+	obj := mustBeRuntimeObject(new(T))
+	kind := reflect.TypeOf(obj).Elem().Name()
+	resource := plural.Plural(strings.ToLower(kind))
+	return &informer[T]{
+		client:       NewTypedClient[T](client, metav1.NamespaceAll, resource),
+		resyncPeriod: resyncPeriod,
+		obj:          obj,
+	}
+}
+
+// func NewFilteredInformer[T any](client Client[T], resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+// 	obj := mustBeRuntimeObject(new(T))
+// 	return cache.NewSharedIndexInformer(
+// 		&cache.ListWatch{
+// 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+// 				return client.List(context.TODO(), options)
+// 			},
+// 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+// 				return client.Watch(context.TODO(), options)
+// 			},
+// 		},
+// 		obj,
+// 		resyncPeriod,
+// 		indexers,
+// 	)
+// }

@@ -36,7 +36,7 @@ type restClient[T any] struct {
 	resource string
 }
 
-func NewRESTClient[T any](client *rest.RESTClient, ns, resource string) *restClient[T] {
+func NewTypedClient[T any](client *rest.RESTClient, ns, resource string) Client[T] {
 	mustBeRuntimeObject(new(T))
 	return &restClient[T]{
 		client:   client,

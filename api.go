@@ -60,8 +60,3 @@ func (in *List[T]) DeepCopyObject() runtime.Object {
 	}
 	return nil
 }
-
-func register(scheme *runtime.Scheme) {
-	scheme.AddKnownTypes()
-	metav1.AddToGroupVersion()
-}

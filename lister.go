@@ -19,8 +19,7 @@ type NamespacedLister[T any] interface {
 
 // lister[T] implements generic interface Lister[T]
 type lister[T any] struct {
-	indexer          cache.Indexer
-	namespacedLister func(ns string) NamespacedLister[T]
+	indexer cache.Indexer
 }
 
 func (l *lister[T]) List(selector labels.Selector) (ret []*T, err error) {

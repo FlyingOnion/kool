@@ -2,28 +2,32 @@
 # will be set to "Controller" if not set
 name: KoolPodController
 
-# retryOnError is the times of retry on error, default is 3
+# retryOnError is the times of retry on error
+# the range is 0 to 10, default is 3
 # if set to 0, it will not retry
 retryOnError: 3
 
-resources:
+# namespace sets the namespace of all resources
+# if namespace is empty, controller will control resources in all namespaces
+namespace: ""
+
+# resources: []
 # resources[0] is the main resource
 # it's the resource that your controller wants to control
 # if resource is empty it will not control any resource
 # if you want to use builtin resource like Pod, Service, Deployment, etc, leave group and version empty
 
 # example1:
+
+# resources:
 # - kind: Deployment
 # - kind: Replicaset
 # - kind: Pod
 
 # example2:
-# - group: yournameorwhatever.github.com
-#   version: v1
-#   kind: YourCustomKind
 
-- group: flyingonion.github.com
+resources:
+- group: whatevergroup.github.com
   version: v1
-  kind: KoolPod
-  namespace: default
-- kind: Deployment
+  kind: Whatever
+

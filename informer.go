@@ -39,11 +39,6 @@ func (m *informer[T]) Informer() cache.SharedIndexInformer {
 		m.resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
-	// return NewFilteredInformer[T](
-	// 	m.client,
-	// 	m.resyncPeriod,
-	// 	cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
-	// )
 }
 
 func (m *informer[T]) Lister() Lister[T] {
@@ -61,19 +56,50 @@ func NewInformer[T any](client *rest.RESTClient, resyncPeriod time.Duration) Inf
 	}
 }
 
-// func NewFilteredInformer[T any](client Client[T], resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-// 	obj := mustBeRuntimeObject(new(T))
-// 	return cache.NewSharedIndexInformer(
-// 		&cache.ListWatch{
-// 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-// 				return client.List(context.TODO(), options)
-// 			},
-// 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-// 				return client.Watch(context.TODO(), options)
-// 			},
-// 		},
-// 		obj,
-// 		resyncPeriod,
-// 		indexers,
-// 	)
-// }
+type NamespacedInformer[T any] interface {
+	Informer() cache.SharedIndexInformer
+	Lister() NamespacedLister[T]
+}
+
+type namespacedInformer[T any] struct {
+	ns           string
+	client       Client[T]
+	resyncPeriod time.Duration
+	// obj is used to initialize SharedIndexInformer
+	obj runtime.Object
+}
+
+func (m *namespacedInformer[T]) Informer() cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return m.client.List(context.TODO(), options)
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return m.client.Watch(context.TODO(), options)
+			},
+		},
+		m.obj,
+		m.resyncPeriod,
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+	)
+}
+
+func (m *namespacedInformer[T]) Lister() NamespacedLister[T] {
+	return &namespacedLister[T]{
+		ns:      m.ns,
+		indexer: m.Informer().GetIndexer(),
+	}
+}
+
+func NewNamespacedInformer[T any](client *rest.RESTClient, ns string, resyncPeriod time.Duration) NamespacedInformer[T] {
+	obj := mustBeRuntimeObject(new(T))
+	kind := reflect.TypeOf(obj).Elem().Name()
+	resource := plural.Plural(strings.ToLower(kind))
+	return &namespacedInformer[T]{
+		ns:           ns,
+		client:       NewTypedClient[T](client, ns, resource),
+		resyncPeriod: resyncPeriod,
+		obj:          obj,
+	}
+}

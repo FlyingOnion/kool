@@ -37,18 +37,15 @@ func main() {
 	}
 	defer f.Close()
 	config := Controller{
-		Enqueue: "ratelimiting",
-		Retry:   3,
+		// Enqueue: "ratelimiting",
+		Retry: 3,
 	}
 	yaml.NewDecoder(f).Decode(&config)
-	if len(config.Resources) == 0 {
-		fmt.Println("No resource to control")
+	if err = config.initAndValidate(); err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
-	// init config
-	if len(config.Name) == 0 {
-		config.Name = "Controller"
-	}
+
 	for i := range config.Resources {
 		if len(config.Resources[i].Group) == 0 && len(config.Resources[i].Version) == 0 {
 

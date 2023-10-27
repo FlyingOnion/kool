@@ -32,14 +32,11 @@ func main() {
 
 	config := mustGetOrLogFatal(clientcmd.BuildConfigFromFlags(master, kubeconfig))
 	client := mustGetOrLogFatal(rest.RESTClientFor(config))
+
+	{{ range .InformerInits -}}
+	{{ . }}
+	{{ end -}}
 	
-	{{ range .Resources }}
-	{{ if .Namespace }}
-	{{- lower .Kind }}Informer := 
-	{{ else }}
-	{{- lower .Kind }}Informer := kool.NewInformer[{{ .Kind }}](client, 30*time.Second)
-	{{ end }}
-	{{ end }}
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 
 	controller := New{{ .Name }}({{ range .Resources }}{{ lower .Kind }}Informer, {{ end }}queue, {{ .Retry }})

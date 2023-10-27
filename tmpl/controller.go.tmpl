@@ -18,14 +18,12 @@ var (
 )
 
 type {{ .Name }} struct {
-	{{- range .Resources }}
-	{{ lower .Kind }}Lister kool.Lister[{{- .Kind -}}]
-	{{- end }}
-
-	{{- range .Resources }}
-	{{ lower .Kind }}Synced cache.InformerSynced
-	{{- end }}
-	
+	{{ range .ListerFields }}
+	{{- . }}
+	{{ end }}
+	{{ range .HasSyncedFields }}
+	{{- . }}
+	{{ end }}
 	queue        workqueue.RateLimitingInterface
 	retryOnError int
 }

@@ -39,7 +39,7 @@ func main() {
 	
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 
-	controller := New{{ .Name }}({{ range .Resources }}{{ lower .Kind }}Informer, {{ end }}queue, {{ .Retry }})
+	controller := New{{ .Name }}({{ range .Resources }}{{ .LowerKind}}Informer, {{ end }}queue, {{ .Retry }})
 
 	sigC := make(chan os.Signal, 1)
 	signal.Notify(sigC, syscall.SIGINT, syscall.SIGTERM)

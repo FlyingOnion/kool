@@ -33,16 +33,16 @@ func NewController(
 	retryOnError int,
 ) *Controller {
 	c := &Controller{
-		podLister:    podInformer.Lister(),             // range
-		podSynced:    podInformer.Informer().HasSynced, // range
 		queue:        queue,
-		retryOnError: retryOnError, // TODO: replace this
+		retryOnError: retryOnError,
 	}
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.AddPod,
 		UpdateFunc: c.UpdatePod,
 		DeleteFunc: c.DeletePod,
 	})
+	c.podLister = podInformer.Lister()             // range
+	c.podSynced = podInformer.Informer().HasSynced // range
 	return c
 }
 

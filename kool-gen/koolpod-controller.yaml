@@ -21,13 +21,29 @@ namespace: ""
 
 # resources:
 # - kind: Deployment
-# - kind: Replicaset
+# - kind: ReplicaSet
 # - kind: Pod
 
 # example2:
 
-resources:
-- group: whatevergroup.github.com
-  version: v1
-  kind: Whatever
+# resources:
+# - group: whatevergroup.github.com
+#   version: v1
+#   kind: Foo
+#   customHandlers:
+#   - Add
+#   - Update
+#   - Delete
+# - group: whatevergroup.github.com
+#   version: v1
+#   kind: Bar
+#   customHandlers:
+#   - Update
+#   - Delete
 
+# example3:
+resources:
+- group: database.spotahome.com
+  version: v1
+  kind: RedisFailover
+  package: github.com/spotahome/redis-operator/api/redisfailover/v1

@@ -46,12 +46,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	for i := range config.Resources {
-		if len(config.Resources[i].Group) == 0 && len(config.Resources[i].Version) == 0 {
-
-		}
-	}
-
 	tmpl := template.New("base").Funcs(sprig.FuncMap())
 	d, err := os.ReadDir("../tmpl")
 	if err != nil {

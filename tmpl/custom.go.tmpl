@@ -1,9 +1,77 @@
 package main
 
-import "context"
+import (
+	"context"
 
-func (c *Controller) doSync(ctx context.Context, namespace, name string) error {
+	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/tools/cache"
+)
+
+func (c *{{ .Name }}) Add{{ (index .Resources 0).Kind }}(obj any) {
+	key, err := cache.MetaNamespaceKeyFunc(obj)
+	if err != nil {
+		runtime.HandleError() // TODO: add error
+		return
+	}
+	c.queue.AddRateLimited(key)
+}
+
+func (c *{{ .Name }}) Update{{ (index .Resources 0).Kind }}(oldObj, curObj any) {
+	key, err := cache.MetaNamespaceKeyFunc(curObj)
+	if err != nil {
+		runtime.HandleError() // TODO: add error
+		return
+	}
+	c.queue.AddRateLimited(key)
+}
+
+func (c *{{ .Name }}) Delete{{ (index .Resources 0).Kind }}(obj any) {
+	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+	if err != nil {
+		runtime.HandleError() // TODO: add error
+		return
+	}
+	c.queue.AddRateLimited(key)
+}
+
+func (c *{{ .Name }}) doSync(ctx context.Context, namespace, name string) error {
 	// TODO: modify this function
 	return nil
 }
 
+{{ range (rest .Resources) }}
+{{- if .CustomAdd }}
+func (c *{{ $.Name }}) Add{{ .Kind }}(obj any) {
+	{{ .LowerKind }} := obj.(*{{ .Kind }})
+	// TODO: do something with {{ .LowerKind }}
+	_ = {{ .LowerKind }}
+}
+{{ end -}}
+{{ if .CustomUpdate }}
+func (c *{{ $.Name }}) Update{{ .Kind }}(oldObj, curObj any) {
+	old := oldObj.(*{{ .Kind }})
+	cur := curObj.(*{{ .Kind }})
+
+	// TODO: do something with old and cur
+}
+{{ end -}}
+{{ if .CustomDelete }}
+func (c *{{ $.Name }}) Delete{{ .Kind }}(obj any) {
+	{{ .LowerKind }}, ok := obj.(*{{ .Kind }})
+	if !ok {
+		// error handling
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			runtime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
+			return
+		}
+		{{ .LowerKind }}, ok = tombstone.Obj.(*{{ .Kind }})
+		if !ok {
+			runtime.HandleError(fmt.Errorf("tombstone contained object that is not a {{ .LowerKind }} %#v", obj))
+			return
+		}
+	}
+	// do something with {{ .LowerKind }}
+}
+{{ end -}}
+{{ end }}

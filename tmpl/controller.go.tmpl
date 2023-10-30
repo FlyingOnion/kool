@@ -30,22 +30,25 @@ type {{ .Name }} struct {
 
 func New{{ .Name }}(
 	{{- range .Resources }}
-	{{ lower .Kind }}Informer kool.Informer[{{- .Kind -}}],
+	{{ .LowerKind}}Informer kool.Informer[{{ .Kind }}],
 	{{- end }}
 	queue workqueue.RateLimitingInterface,
     retryOnError int,
 ) *{{ .Name }} {
 	c := &{{ .Name }}{
-		{{- range .Resources }}
-		{{ lower .Kind }}Lister: {{ lower .Kind }}Informer.Lister(),
-		{{- end }}
-		{{- range .Resources }}
-		{{ lower .Kind }}Synced: {{ lower .Kind }}Informer.Informer().HasSynced,
-		{{- end }}
 		queue:        queue,
-        retryOnError: retryOnError,
+		retryOnError: retryOnError,
 	}
-
+	{{ range .Resources }}
+	{{- .LowerKind }}Informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    {{ if .CustomAdd }}c.Add{{ .Kind }},{{ else }}nil,{{ end }}
+		UpdateFunc: {{ if .CustomUpdate }}c.Update{{ .Kind }},{{ else }}nil,{{ end }}
+		DeleteFunc: {{ if .CustomDelete }}c.Delete{{ .Kind }},{{ else }}nil,{{ end }}
+	})
+	{{ end }}
+	{{ range .StructFieldInits }}
+	{{- . }}
+	{{ end }}
 	return c
 }
 
@@ -61,7 +64,7 @@ func (c *{{ .Name }}) Run(ctx context.Context, workers int) {
 	// go c.informer.Run(stopCh)
 
 	// Wait for all involved caches to be synced, before processing items from the queue is started
-	if !cache.WaitForCacheSync(ctx.Done(){{ range .Resources }}, c.{{ lower .Kind }}Synced{{ end }}) {
+	if !cache.WaitForCacheSync(ctx.Done(){{ range .Resources }}, c.{{ .LowerKind}}Synced{{ end }}) {
 		runtime.HandleError(ErrSyncTimeout)
 		return
 	}

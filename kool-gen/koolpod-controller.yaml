@@ -11,39 +11,52 @@ retryOnError: 3
 # if namespace is empty, controller will control resources in all namespaces
 namespace: ""
 
-# resources: []
+# resources is the list of resources that controller may control
 # resources[0] is the main resource
 # it's the resource that your controller wants to control
 # if resource is empty it will not control any resource
-# if you want to use builtin resource like Pod, Service, Deployment, etc, leave group and version empty
+# if you want to use builtin resource like Pod, Service, Deployment, etc., leave the group field empty
 
-# example1:
+# customHandlers adds event handlers for the resource
+# it's a list of strings, containing "Create", "Update" and "Delete"
+# by default, the main resource (resources[0]) SHOULD customize all 3 handlers
+# and the generated code has already implemented them
+# for other resources, you don't need to add all of them, just add the ones you need
+# if customHandlers is empty, kool-gen will generate all 3 custom handlers to custom.go
 
+# package is the go package name of the resource
+# if package is empty, it means that the resource is defined in the "main" package
+# if group is empty, the value of package field will be ignored
+# kool-gen will set this field as "k8s.io/api/<group>/<version>", where group and version depends on kind
+# for example, if kind is "Deployment", the package will be "k8s.io/api/apps/v1"
+
+# # example1: only control builtin resources like official DeploymentController
 # resources:
 # - kind: Deployment
 # - kind: ReplicaSet
 # - kind: Pod
-
-# example2:
-
-# resources:
-# - group: whatevergroup.github.com
-#   version: v1
-#   kind: Foo
 #   customHandlers:
-#   - Add
-#   - Update
-#   - Delete
-# - group: whatevergroup.github.com
-#   version: v1
-#   kind: Bar
-#   customHandlers:
-#   - Update
 #   - Delete
 
-# example3:
+# example2: control custom resources
 resources:
-- group: database.spotahome.com
+- group: whatevergroup.com
   version: v1
-  kind: RedisFailover
-  package: github.com/spotahome/redis-operator/api/redisfailover/v1
+  kind: Foo
+  package: ""
+- group: whatevergroup.com
+  version: v1
+  kind: Bar
+  package: ""
+  customHandlers:
+  - Update
+  - Delete
+
+# # example3: control external resources from third-party projects
+# resources:
+# - group: database.spotahome.com
+#   version: v1
+#   kind: RedisFailover
+#   package: github.com/spotahome/redis-operator/api/redisfailover/v1
+
+# resources: []

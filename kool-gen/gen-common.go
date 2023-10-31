@@ -13,8 +13,8 @@ func (c Controller) structureFieldInits() []string {
 	for i := range c.Resources {
 		// c.<kind>Lister := <kind>Informer.Lister()
 		// c.<kind>Synced := <kind>Informer.Informer().HasSynced
-		expressions = append(expressions, "c."+c.Resources[i].LowerKind+"Lister = c."+c.Resources[i].LowerKind+"Informer.Lister()")
-		expressions = append(expressions, "c."+c.Resources[i].LowerKind+"Synced = c."+c.Resources[i].LowerKind+"Informer.Informer().HasSynced")
+		expressions = append(expressions, "c."+c.Resources[i].LowerKind+"Lister = "+c.Resources[i].LowerKind+"Informer.Lister()")
+		expressions = append(expressions, "c."+c.Resources[i].LowerKind+"Synced = "+c.Resources[i].LowerKind+"Informer.Informer().HasSynced")
 	}
 	return expressions
 }

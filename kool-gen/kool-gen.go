@@ -11,15 +11,6 @@ import (
 )
 
 var importMap = map[string]Import{
-	"Pod":                   corev1,
-	"Node":                  corev1,
-	"Namespace":             corev1,
-	"Service":               corev1,
-	"ConfigMap":             corev1,
-	"Secret":                corev1,
-	"PersistentVolume":      corev1,
-	"PersistentVolumeClaim": corev1,
-
 	"Deployment":  appsv1,
 	"StatefulSet": appsv1,
 	"ReplicaSet":  appsv1,
@@ -27,6 +18,40 @@ var importMap = map[string]Import{
 
 	"Job":     batchv1,
 	"CronJob": batchv1,
+
+	"Binding":               corev1,
+	"Pod":                   corev1,
+	"PodTemplate":           corev1,
+	"Endpoints":             corev1,
+	"ReplicationController": corev1,
+	"Node":                  corev1,
+	"Namespace":             corev1,
+	"Service":               corev1,
+	"ServiceAccount":        corev1,
+	"ConfigMap":             corev1,
+	"Secret":                corev1,
+	"LimitRange":            corev1,
+	"ResourceQuota":         corev1,
+	"PersistentVolume":      corev1,
+	"PersistentVolumeClaim": corev1,
+
+	"EndpointSlice": discoveryv1,
+
+	"Ingress":       networkingv1,
+	"IngressClass":  networkingv1,
+	"NetworkPolicy": networkingv1,
+
+	"Role":               rbacv1,
+	"RoleBinding":        rbacv1,
+	"ClusterRole":        rbacv1,
+	"ClusterRoleBinding": rbacv1,
+
+	"PriorityClass": schedulingv1,
+
+	"CSIDriver":          storagev1,
+	"CSINodes":           storagev1,
+	"CSIStorageCapacity": storagev1,
+	"StorageClass":       storagev1,
 }
 
 func main() {

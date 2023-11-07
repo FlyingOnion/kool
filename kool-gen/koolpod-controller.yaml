@@ -43,11 +43,11 @@ resources:
 - group: whatevergroup.com
   version: v1
   kind: Foo
-  package: ""
+  package: "whatevergroup.com/whatever/v1"
 - group: whatevergroup.com
-  version: v1
+  version: v1beta1
   kind: Bar
-  package: ""
+  package: "whatevergroup.com/whatever/v1beta1"
   customHandlers:
   - Update
   - Delete

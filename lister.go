@@ -1,9 +1,12 @@
 package kool
 
 import (
+	"strings"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -59,7 +62,16 @@ func (l *namespacedLister[T]) Get(name string) (*T, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(schema.GroupResource{}, name) // TODO: change groupresource
+		// check scheme typeToGVK and get group
+		gvkList, _, err := scheme.Scheme.ObjectKinds(mustBeRuntimeObject(obj))
+		if err != nil {
+			return nil, err
+		}
+		resource := strings.ToLower(gvkList[0].Kind)
+		return nil, errors.NewNotFound(schema.GroupResource{
+			Group:    gvkList[0].Group,
+			Resource: resource,
+		}, name)
 	}
 	return obj.(*T), nil
 }

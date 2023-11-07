@@ -20,7 +20,7 @@ func DeepCopy[T any](in, out *T) {
 		// or use json marshal/unmarshal
 		// maybe it's not the fastest, but it's surely the safest
 		b, _ := json.Marshal(in)
-		json.Unmarshal(b, &out)
+		json.Unmarshal(b, out)
 	}
 }
 

@@ -5,6 +5,7 @@ go 1.21.1
 require (
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/gertd/go-pluralize v0.2.1
+	github.com/mitchellh/mapstructure v1.5.0
 	github.com/spf13/pflag v1.0.5
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.28.2

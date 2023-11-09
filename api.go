@@ -1,8 +1,7 @@
 package kool
 
 import (
-	"encoding/json"
-
+	"github.com/mitchellh/mapstructure"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -16,12 +15,9 @@ func DeepCopy[T any](in, out *T) {
 	if d, ok := _in.(DeepCopyGen[T]); ok {
 		// use deepcopy-gen
 		d.DeepCopyInto(out)
-	} else {
-		// or use json marshal/unmarshal
-		// maybe it's not the fastest, but it's surely the safest
-		b, _ := json.Marshal(in)
-		json.Unmarshal(b, out)
+		return
 	}
+	mapstructure.Decode(in, out)
 }
 
 type List[T any] struct {

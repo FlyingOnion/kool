@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/FlyingOnion/kool"
-	"k8s.io/apimachinery/pkg/util/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -58,7 +58,7 @@ func New{{ .Name }}(
 }
 
 func (c *{{ .Name }}) Run(ctx context.Context, workers int) {
-	defer runtime.HandleCrash()
+	defer utilruntime.HandleCrash()
 
 	// Let the workers stop when we are done
 	defer c.queue.ShutDown()
@@ -70,7 +70,7 @@ func (c *{{ .Name }}) Run(ctx context.Context, workers int) {
 
 	// Wait for all involved caches to be synced, before processing items from the queue is started
 	if !cache.WaitForCacheSync(ctx.Done(){{ range .Resources }}, c.{{ .LowerKind }}Synced{{ end }}) {
-		runtime.HandleError(ErrSyncTimeout)
+		utilruntime.HandleError(ErrSyncTimeout)
 		return
 	}
 
@@ -130,6 +130,6 @@ func (c *{{ .Name }}) handleErr(ctx context.Context, err error, key any) {
 	}
 
 	c.queue.Forget(key)
-	runtime.HandleError(err)
+	utilruntime.HandleError(err)
 	logger.Info("Dropping object out of the queue", "cacheKey", key)
 }

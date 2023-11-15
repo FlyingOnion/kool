@@ -15,3 +15,11 @@ func (c Controller) globalInformerInits() []string {
 	}
 	return expressions
 }
+
+func (c Controller) globalNewControllerArgs() []string {
+	expressions := make([]string, 0, len(c.Resources))
+	for i := range c.Resources {
+		expressions = append(expressions, c.Resources[i].LowerKind+`Informer kool.Informer[`+c.Resources[i].GoType+`],`)
+	}
+	return expressions
+}

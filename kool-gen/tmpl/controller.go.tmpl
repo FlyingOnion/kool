@@ -34,8 +34,8 @@ type {{ .Name }} struct {
 }
 
 func New{{ .Name }}(
-	{{- range .Resources }}
-	{{ .LowerKind }}Informer kool.Informer[{{ .GoType }}],
+	{{- range .NewControllerArgs }}
+	{{ . }}
 	{{- end }}
 	queue workqueue.RateLimitingInterface,
     retryOnError int,

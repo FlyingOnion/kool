@@ -188,9 +188,11 @@ func (c *Controller) initAndValidate() {
 	if len(c.Namespace) == 0 {
 		c.ListerFields = c.globalListerFields()
 		c.InformerInits = c.globalInformerInits()
+		c.NewControllerArgs = c.globalNewControllerArgs()
 	} else {
 		c.ListerFields = c.namespacedListerFields()
 		c.InformerInits = c.namespacedInformerInits()
+		c.NewControllerArgs = c.namespacedNewControllerArgs()
 	}
 	c.HasSyncedFields = c.hasSyncedFields()
 	c.StructFieldInits = c.structureFieldInits()

@@ -2,16 +2,15 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/printer"
 	"go/token"
 	"os"
-	"strings"
+	"path/filepath"
 	"text/template"
 
-	"github.com/Masterminds/sprig/v3"
+	"github.com/charmbracelet/log"
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -33,7 +32,7 @@ func retrieveImports(file *ast.File) sets.Set[string] {
 //
 // controllerName is the name of the controller, by default "c", such as
 //
-//	func(c *Controller)
+//	func(--->c *Controller)
 func retrieveControllerMethods(file *ast.File, controllerName string) sets.Set[string] {
 	methods := sets.New[string]()
 	for _, decl := range file.Decls {
@@ -54,74 +53,28 @@ func retrieveControllerMethods(file *ast.File, controllerName string) sets.Set[s
 	return methods
 }
 
-func main() {
-	yamlFile, err := os.Open("koolpod-controller.yaml")
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	config := Controller{
-		// Enqueue: "ratelimiting",
-		Retry: 3,
-	}
-	yaml.NewDecoder(yamlFile).Decode(&config)
-	yamlFile.Close()
-	if err = config.initAndValidate(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	tmpl := template.New("base").Funcs(sprig.FuncMap())
-	d, err := os.ReadDir("../tmpl")
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	for _, dirEntry := range d {
-		name := dirEntry.Name()
-		if !strings.HasSuffix(name, "go.tmpl") {
-			continue
-		}
-		fileName := strings.TrimSuffix(name, ".tmpl")
-		fmt.Printf("initializing %s from template\n", fileName)
-		tmpl2, err := tmpl.New(name).ParseFiles("../tmpl/" + name)
+func createOrUpdateCustom(customTmpl *template.Template, config *Controller) {
+	fp := filepath.Join(config.Base, customTmpl.Name()+".go")
+	if _, err := os.Stat(fp); os.IsNotExist(err) {
+		f, err := os.Create(fp)
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			log.Fatal("failed to write file", "file", fp, "cause", err)
 		}
-		f, err := os.Create("./gen/" + fileName)
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-		tmpl2.Execute(f, config)
+		err = customTmpl.Execute(f, config)
 		f.Close()
-	}
-	fmt.Println("initializing custom methods")
-	customTmpl, err := tmpl.New("custom").ParseFiles("../tmpl/custom")
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	if _, err = os.Stat("./gen/custom.go"); os.IsNotExist(err) {
-		f, err := os.Create("./gen/custom.go")
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			log.Fatal("failed to execute template", "template", customTmpl.Name(), "cause", err)
 		}
-		customTmpl.Execute(f, config)
-		f.Close()
-		fmt.Println("done")
 		return
 	}
 
-	fmt.Println("custom.go already exists, try to add new codes ...")
-	fmt.Println("(kool-gen will not rewrite existing codes)")
+	log.Debug(fp + " already exists")
+	log.Info("try to add new codes ...")
+	log.Info("(kool-gen will not rewrite existing codes)")
 
-	f1, err := os.Open("./gen/custom.go")
+	f1, err := os.Open(fp)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal("failed to open file", "file", fp, "cause", err)
 	}
 
 	var buf bytes.Buffer
@@ -133,8 +86,7 @@ func main() {
 	fset := token.NewFileSet()
 	target, err := parser.ParseFile(fset, "", b1, parser.AllErrors|parser.ParseComments)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal("failed to parse AST from existing file", "file", fp, "cause", err)
 	}
 
 	buf.Reset()
@@ -143,8 +95,7 @@ func main() {
 	copy(b2, buf.Bytes())
 	cur, err := parser.ParseFile(token.NewFileSet(), "", b2, parser.AllErrors|parser.ParseComments)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal("failed to parse AST from template", "template", customTmpl.Name(), "cause", err)
 	}
 
 	// try to add missing imports
@@ -158,7 +109,7 @@ func main() {
 
 	// if there's no import declaration, create one
 	if g == nil {
-		fmt.Println("no import declaration found in file")
+		log.Debug("no import declaration found in existing file", "file", fp)
 		g = &ast.GenDecl{
 			Tok: token.IMPORT,
 		}
@@ -169,12 +120,12 @@ func main() {
 		if existedImports.Has(imp.Path.Value) {
 			continue
 		}
-		fmt.Println("new import will be added:", imp.Path.Value)
+		log.Debug("new package will be added to import list", "package", imp.Path.Value)
 
 		g.Specs = append(g.Specs, imp)
 	}
 	if !hasImport && len(g.Specs) > 0 {
-		fmt.Println("creating import declaration")
+		log.Debug("creating import declaration")
 		target.Decls = append([]ast.Decl{g}, target.Decls...)
 	}
 
@@ -184,14 +135,6 @@ func main() {
 		Node:     target,
 		Comments: target.Comments,
 	})
-
-	// if s := string(tmpBuf.Bytes()); strings.HasSuffix(s, NewLine) {
-	// 	if !strings.HasSuffix(s, DoubleNewLine) {
-	// 		tmpBuf.WriteString(NewLine)
-	// 	}
-	// } else {
-	// 	tmpBuf.WriteString(DoubleNewLine)
-	// }
 
 	existedMethods := retrieveControllerMethods(target, config.Name)
 	for _, decl := range cur.Decls {
@@ -208,24 +151,97 @@ func main() {
 			continue
 		}
 
-		fmt.Printf("new method will be added: *%s.%s\n", config.Name, funcDecl.Name.Name)
+		log.Debug("new method will be added",
+			"receiver", "*"+config.Name,
+			"method", funcDecl.Name.Name,
+		)
 		tmpBuf.WriteString(NewLine)
 		tmpBuf.Write(b2[funcDecl.Pos()-1 : funcDecl.End()-1])
 		tmpBuf.WriteString(NewLine)
 	}
-	if tmpBuf.Len() <= 4+len(b1) {
-		fmt.Println("no new codes")
-		fmt.Println("done")
-		return
+	if tmpBuf.Len() == len(b1) {
+		log.Debug("no new codes")
 	}
 
-	f1, err = os.Create("./gen/custom.go")
+	f1, err = os.Create(fp)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal("failed to create file", "file", fp, "cause", err)
 	}
-	fmt.Println("writing file")
+	log.Debug("writing file", "file", fp)
 	tmpBuf.WriteTo(f1)
 	f1.Close()
-	fmt.Println("done")
+}
+
+func createOrRewrite(tmpl *template.Template, config *Controller) {
+	fp := filepath.Join(config.Base, tmpl.Name()+".go")
+	f, err := os.Create(fp)
+	if err != nil {
+		log.Fatal("failed to write file", "file", fp, "cause", err)
+	}
+	err = tmpl.Execute(f, config)
+	f.Close()
+	if err != nil {
+		log.Fatal("failed to execute template", "template", tmpl.Name(), "cause", err)
+	}
+}
+
+// func createOrRewriteDeepCopy(tmpl *template.Template, config *Controller) error {
+// 	for i := range config.Resources {
+// 		if !config.Resources[i].GenDeepCopy {
+// 			continue
+// 		}
+
+// 		var fp string
+// 		if len(config.Resources[i].Package) == 0 {
+// 			fp = filepath.Join(config.Base, config.Resources[i].LowerKind+"_kool-gen.deepcopy.go")
+// 		} else {
+// 			// filepath = basedir + (package - gomodule)
+// 			relativePath, err := filepath.Rel(config.GoConfig.Module, config.Resources[i].Package)
+// 			if err != nil {
+// 				return err
+// 			}
+// 			fp = filepath.Join(config.Base, relativePath, config.Resources[i].LowerKind+"_kool-gen.deepcopy.go")
+// 		}
+// 		log.Info("write deepcopy of", config.Resources[i].Kind, "to", fp)
+
+// 		f, err := os.Create(fp)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		tmpl.Execute(f, &(config.Resources[i]))
+// 		f.Close()
+// 	}
+// 	return nil
+// }
+
+func readConfig(filepath string) *Controller {
+	yamlFile, err := os.Open(filepath)
+	if err != nil {
+		log.Fatal("failed to read file", "file", filepath, "cause", err)
+	}
+	config := defaultController()
+	err = yaml.NewDecoder(yamlFile).Decode(config)
+	yamlFile.Close()
+	if err != nil {
+		log.Fatal("failed to parse config", "cause", err)
+	}
+	return config
+}
+
+func main() {
+	config := readConfig("koolpod-controller.yaml")
+	config.initAndValidate()
+
+	log.Info("initializing main files")
+	createOrRewrite(tmplMain, config)
+
+	log.Debug("initialzing controller.go")
+	createOrRewrite(tmplController, config)
+
+	log.Info("initializing custom methods")
+	createOrUpdateCustom(tmplCustom, config)
+
+	// log.Info("generating deepcopy methods")
+	// createOrRewriteDeepCopy(tmplDeepCopy, config)
+	log.Info("done")
 }

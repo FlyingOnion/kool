@@ -56,7 +56,7 @@ type Resource struct {
 	Kind    string
 
 	Package string
-	Alias   string
+	// Alias   string
 
 	CustomHandlers []string `yaml:"customHandlers"`
 
@@ -126,60 +126,10 @@ func (c *Controller) initAndValidate() {
 		c.Resources[i].CustomDelete = i == 0 || len(c.Resources[i].CustomHandlers) == 0 || slices.Contains(c.Resources[i].CustomHandlers, "Delete")
 
 		if len(c.Resources[i].Group) == 0 {
-			// it's a k8s builtin type
-			pkgGroup, ok := kind2Group(c.Resources[i].Kind)
-			if !ok && len(c.Resources[i].Package) == 0 {
-				log.Fatal(
-					msgConfigInvalid,
-					"cause", msgUnknownResourceKind,
-					"kind", c.Resources[i].Kind,
-					"tip", msgUnknownResourceKindTip,
-				)
-			}
-
-			emptyVersion, emptyPackage := len(c.Resources[i].Version) == 0, len(c.Resources[i].Package) == 0
-			switch {
-			case emptyVersion && emptyPackage:
-				c.Resources[i].Version = "v1"
-				c.Resources[i].Package = "k8s.io/api/" + pkgGroup + "/v1"
-			case emptyVersion:
-				version, found := getVersionFromPackage(c.Resources[i].Package)
-				if !found {
-					log.Warn(msgNoVersionInPackage, "package", c.Resources[i].Package)
-					log.Warn(msgIncompatibility)
-				}
-				c.Resources[i].Version = version
-			case emptyPackage:
-				c.Resources[i].Package = "k8s.io/api/" + pkgGroup + "/" + c.Resources[i].Version
-			default:
-				version, found := getVersionFromPackage(c.Resources[i].Package)
-				if found && version != c.Resources[i].Version {
-					log.Warn(msgInconsistentVersion, "package version", version, "resource version", c.Resources[i].Version)
-					log.Warn(msgIncompatibility)
-				}
-			}
-			c.Resources[i].Alias = getAlias(c.Resources[i].Package)
-			c.Resources[i].GoType = c.Resources[i].Alias + "." + c.Resources[i].Kind
-			imports.Insert(Import{Alias: c.Resources[i].Alias, Pkg: c.Resources[i].Package})
-			continue
+			initAndValidateBuiltinResource(&(c.Resources[i]), imports)
+		} else {
+			initAndValidateThirdPartyResource(&(c.Resources[i]), imports)
 		}
-		if isK8sBuiltinGroup(c.Resources[i].Group) {
-			log.Fatal(msgConfigInvalid,
-				"cause", msgInvalidThirdPartyGroup,
-				"group", c.Resources[i].Group,
-				"tip", msgInvalidThirdPartyGroupTip,
-			)
-		}
-		// custom type
-		if len(c.Resources[i].Package) == 0 {
-			// the resource definition is in the same package
-			// no need to import
-			c.Resources[i].GoType = c.Resources[i].Kind
-			continue
-		}
-		c.Resources[i].Alias = getAlias(c.Resources[i].Package)
-		c.Resources[i].GoType = c.Resources[i].Alias + "." + c.Resources[i].Kind
-		imports.Insert(Import{Alias: c.Resources[i].Alias, Pkg: c.Resources[i].Package})
 	}
 	importList := imports.UnsortedList()
 	sort.Sort(ImportList(importList))
@@ -205,4 +155,80 @@ func getVersionFromPackage(pkg string) (string, bool) {
 		}
 	}
 	return "v1", false
+}
+
+func initAndValidateThirdPartyResource(r *Resource, imports sets.Set[Import]) {
+	if isK8sBuiltinGroup(r.Group) {
+		log.Fatal(msgConfigInvalid,
+			"cause", msgInvalidThirdPartyGroup,
+			"group", r.Group,
+			"tip", msgInvalidThirdPartyGroupTip,
+		)
+	}
+
+	version, found := getVersionFromPackage(r.Package)
+	if !found {
+		log.Warn(msgNoVersionInPackage, "package", r.Package)
+		log.Warn(msgIncompatibility)
+		r.Version = version
+		return
+	}
+	// version found but inconsistent
+	if version != r.Version {
+		log.Warn(msgInconsistentVersion, "package version", version, "resource version", r.Version)
+		log.Warn(msgIncompatibility)
+	}
+
+	// check if resource is defined in the same package
+	if len(r.Package) == 0 {
+		// g > 0 && p == 0 => local import
+		// no need to import
+		r.GoType = r.Kind
+		return
+	}
+
+	alias := getAlias(r.Package)
+	r.GoType = alias + "." + r.Kind
+	imports.Insert(Import{Alias: alias, Pkg: r.Package})
+}
+
+func initAndValidateBuiltinResource(r *Resource, imports sets.Set[Import]) {
+	pkgGroup, ok := kind2Group(r.Kind)
+	if !ok && len(r.Package) == 0 {
+		log.Fatal(
+			msgConfigInvalid,
+			"cause", msgUnknownResourceKind,
+			"kind", r.Kind,
+			"tip", msgUnknownResourceKindTip,
+		)
+	}
+
+	emptyVersion, emptyPackage := len(r.Version) == 0, len(r.Package) == 0
+	switch {
+	case emptyVersion && emptyPackage:
+		r.Version = "v1"
+		r.Package = "k8s.io/api/" + pkgGroup + "/v1"
+	case emptyVersion:
+		version, found := getVersionFromPackage(r.Package)
+		if !found {
+			log.Warn(msgNoVersionInPackage, "package", r.Package)
+			log.Warn(msgIncompatibility)
+		}
+		r.Version = version
+	case emptyPackage:
+		r.Package = "k8s.io/api/" + pkgGroup + "/" + r.Version
+	default:
+		version, found := getVersionFromPackage(r.Package)
+		if found && version != r.Version {
+			log.Warn(msgInconsistentVersion, "kind", r.Kind, "package version", version, "resource version", r.Version)
+			log.Warn(msgIncompatibility)
+		}
+	}
+	alias := getAlias(r.Package)
+	r.GoType = alias + "." + r.Kind
+	imports.Insert(Import{Alias: alias, Pkg: r.Package})
+	if r.GenDeepCopy {
+		log.Info(msgNoNeedToGenDeepCopy, "kind", r.Kind)
+		r.GenDeepCopy = false
+	}
 }

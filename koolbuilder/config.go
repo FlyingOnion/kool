@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -107,7 +109,7 @@ const (
 const (
 	defaultName          = "Controller"
 	defaultGoVersion     = "1.21.1"
-	defaultK8sAPIVersion = "0.28.3"
+	defaultK8sAPIVersion = "0.28.2"
 )
 
 func defaultController() *Controller {
@@ -126,6 +128,15 @@ func defaultController() *Controller {
 func (c *Controller) initAndValidate() {
 	if len(c.Base) == 0 {
 		c.Base = "."
+	}
+	c.Base = filepath.Clean(c.Base)
+	// mkdir if needed
+	log.Info("checking directory", "directory", c.Base)
+	if _, err := os.Stat(c.Base); os.IsNotExist(err) {
+		err := os.MkdirAll(c.Base, os.ModePerm)
+		if err != nil {
+			log.Fatal("failed to create directory", "directory", c.Base, "cause", err)
+		}
 	}
 	if len(c.Name) == 0 {
 		c.Name = defaultName

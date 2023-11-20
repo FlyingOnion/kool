@@ -7,6 +7,7 @@ import (
 	"go/printer"
 	"go/token"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"text/template"
 
@@ -51,6 +52,22 @@ func retrieveControllerMethods(file *ast.File, controllerName string) sets.Set[s
 		methods.Insert(funcDecl.Name.Name)
 	}
 	return methods
+}
+
+func createOrRewriteGoMod(goModTmpl *template.Template, config *Controller) {
+	fp := filepath.Join(config.Base, "go.mod")
+	if _, err := os.Stat(fp); os.IsNotExist(err) {
+		f, err := os.Create(fp)
+		if err != nil {
+			log.Fatal("failed to write file", "file", fp, "cause", err)
+		}
+		err = goModTmpl.Execute(f, config)
+		f.Close()
+		if err != nil {
+			log.Fatal("failed to execute template", "template", goModTmpl.Name(), "cause", err)
+		}
+		return
+	}
 }
 
 func createOrUpdateCustom(customTmpl *template.Template, config *Controller) {
@@ -231,6 +248,9 @@ func main() {
 	config := readConfig("koolpod-controller.yaml")
 	config.initAndValidate()
 
+	log.Info("initializing go.mod")
+	createOrRewriteGoMod(tmplGoMod, config)
+
 	log.Info("initializing main files")
 	createOrRewrite(tmplMain, config)
 
@@ -243,4 +263,14 @@ func main() {
 	log.Info("generating deepcopy methods")
 	createOrRewriteDeepCopy(tmplDeepCopy, config)
 	log.Info("done")
+
+	log.Info("run go mod tidy")
+	cmd := exec.Command("go", "mod", "tidy")
+	cmd.Dir = config.Base
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
+	if err != nil {
+		log.Fatal("failed to run go mod tidy", "cause", err)
+	}
 }

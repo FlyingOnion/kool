@@ -7,6 +7,9 @@ import (
 	"github.com/Masterminds/sprig/v3"
 )
 
+//go:embed tmpl/gomod.tmpl
+var tmplContentGoMod string
+
 //go:embed tmpl/main.go.tmpl
 var tmplContentMain string
 
@@ -21,6 +24,7 @@ var tmplContentDeepCopy string
 
 var (
 	tmplBase       = template.New("base").Funcs(sprig.FuncMap())
+	tmplGoMod      = template.Must(tmplBase.New("gomod").Parse(tmplContentGoMod))
 	tmplMain       = template.Must(tmplBase.New("main").Parse(tmplContentMain))
 	tmplCustom     = template.Must(tmplBase.New("custom").Parse(tmplContentCustom))
 	tmplController = template.Must(tmplBase.New("controller").Parse(tmplContentController))

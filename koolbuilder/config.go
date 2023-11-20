@@ -12,6 +12,9 @@ import (
 type Controller struct {
 	Base string `yaml:"base"`
 	Name string `yaml:"name"`
+
+	Go GoConfig `yaml:"go"`
+
 	// Enqueue   string     `yaml:"enqueue"`
 	Retry     int        `yaml:"retryOnError"`
 	Namespace string     `yaml:"namespace"`
@@ -48,6 +51,12 @@ type Controller struct {
 	NewControllerArgs []string `yaml:"-"`
 
 	Imports []Import `yaml:"-"`
+}
+
+type GoConfig struct {
+	Module        string
+	Version       string
+	K8sAPIVersion string `yaml:"k8sAPIVersion"`
 }
 
 type Resource struct {
@@ -91,19 +100,44 @@ const (
 	msgInconsistentVersion       = `version information in package is inconsistent with resource version`
 	msgInvalidThirdPartyGroup    = `invalid third-party group name; group name cannot be any of ` + k8sBuiltinGroupsString + ` or ends with ".k8s.io" because they are k8s builtin groups`
 	msgInvalidThirdPartyGroupTip = `if you need a builtin resource, leave group empty, set package to k8s.io/api/<package-group>/<version> and try again`
+	msgNoNeedToGenDeepCopy       = `no need to generate DeepCopy`
+	msgShouldNotGenDeepCopy      = `should not generate DeepCopy`
+)
+
+const (
+	defaultName          = "Controller"
+	defaultGoVersion     = "1.21.1"
+	defaultK8sAPIVersion = "0.28.3"
 )
 
 func defaultController() *Controller {
 	return &Controller{
-		Base:  ".",
-		Name:  "Controller",
+		Base: ".",
+		Name: defaultName,
+		Go: GoConfig{
+			Module:        "controller",
+			Version:       defaultGoVersion,
+			K8sAPIVersion: defaultK8sAPIVersion,
+		},
 		Retry: 3,
 	}
 }
 
 func (c *Controller) initAndValidate() {
+	if len(c.Base) == 0 {
+		c.Base = "."
+	}
 	if len(c.Name) == 0 {
-		c.Name = "Controller"
+		c.Name = defaultName
+	}
+	if len(c.Go.Module) == 0 {
+		c.Go.Module = strings.ToLower(c.Name)
+	}
+	if len(c.Go.Version) == 0 {
+		c.Go.Version = defaultGoVersion
+	}
+	if len(c.Go.K8sAPIVersion) == 0 {
+		c.Go.K8sAPIVersion = defaultK8sAPIVersion
 	}
 	if c.Retry < 0 || c.Retry > 10 {
 		log.Fatal(msgConfigInvalid, "cause", msgInvalidRetry)
@@ -127,8 +161,17 @@ func (c *Controller) initAndValidate() {
 
 		if len(c.Resources[i].Group) == 0 {
 			initAndValidateBuiltinResource(&(c.Resources[i]), imports)
+			if c.Resources[i].GenDeepCopy {
+				log.Info(msgNoNeedToGenDeepCopy, "kind", c.Resources[i].Kind)
+				c.Resources[i].GenDeepCopy = false
+			}
 		} else {
 			initAndValidateThirdPartyResource(&(c.Resources[i]), imports)
+			if c.Resources[i].GenDeepCopy && len(c.Resources[i].Package) > 0 && !strings.HasPrefix(c.Resources[i].Package, c.Go.Module) {
+				// non-local third-party resource should not generate DeepCopy
+				log.Fatal(msgConfigInvalid,
+					"cause", msgShouldNotGenDeepCopy)
+			}
 		}
 	}
 	importList := imports.UnsortedList()
@@ -190,6 +233,10 @@ func initAndValidateThirdPartyResource(r *Resource, imports sets.Set[Import]) {
 	alias := getAlias(r.Package)
 	r.GoType = alias + "." + r.Kind
 	imports.Insert(Import{Alias: alias, Pkg: r.Package})
+
+	if r.GenDeepCopy && !strings.HasPrefix(r.Package) {
+
+	}
 }
 
 func initAndValidateBuiltinResource(r *Resource, imports sets.Set[Import]) {
@@ -227,8 +274,4 @@ func initAndValidateBuiltinResource(r *Resource, imports sets.Set[Import]) {
 	alias := getAlias(r.Package)
 	r.GoType = alias + "." + r.Kind
 	imports.Insert(Import{Alias: alias, Pkg: r.Package})
-	if r.GenDeepCopy {
-		log.Info(msgNoNeedToGenDeepCopy, "kind", r.Kind)
-		r.GenDeepCopy = false
-	}
 }

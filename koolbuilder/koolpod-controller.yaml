@@ -1,6 +1,23 @@
+# base is the base dir of generated code
+# default is current dir
+base: "gen"
+
 # name is the name of controller
 # will be set to "Controller" if not set
 name: KoolPodController
+
+go:
+  # go module name
+  # will be set to lowercase of .name if not set
+  module: koolpodcontroller
+
+  # should be 1.18 or higher because generics are used
+  version: 1.21.1
+
+  # k8sAPIVersion is the version of k8s api library
+  # it is used in go.mod require statement
+  # the version does not contain prefix "v"
+  k8sAPIVersion: 0.28.3
 
 # retryOnError is the times of retry on error
 # the range is 0 to 10, default is 3
@@ -22,15 +39,19 @@ namespace: ""
 # by default, the main resource (resources[0]) SHOULD customize all 3 handlers
 # and the generated code has already implemented them
 # for other resources, you don't need to add all of them, just add the ones you need
-# if customHandlers is empty, kool-gen will generate all 3 custom handlers to custom.go
+# if customHandlers is empty, koolbuilder will generate all 3 custom handlers to custom.go
 
 # package is the go package name of the resource
 # if package is empty, it means that the resource is defined in the "main" package
 # if group is empty, the value of package field will be ignored
-# kool-gen will set this field as "k8s.io/api/<group>/<version>", where group and version depends on kind
+# koolbuilder will set this field as "k8s.io/api/<group>/<version>", where group and version depends on kind
 # for example, if kind is "Deployment", the package will be "k8s.io/api/apps/v1"
 
-# # example1: only control builtin resources like official DeploymentController
+# # example1: control Pod
+resources:
+- kind: Pod
+
+# # example2: control Deployment, ReplicaSet and Pod like official DeploymentController
 # resources:
 # - kind: Deployment
 # - kind: ReplicaSet
@@ -38,25 +59,31 @@ namespace: ""
 #   customHandlers:
 #   - Delete
 
-# example2: control custom resources
-resources:
-- group: whatevergroup.com
-  version: v1
-  kind: Foo
-  package: "whatevergroup.com/whatever/v1"
-- group: whatevergroup.com
-  version: v1beta1
-  kind: Bar
-  package: "whatevergroup.com/whatever/v1beta1"
-  customHandlers:
-  - Update
-  - Delete
+# # example3: control custom resources
+# resources:
+# - group: whatevergroup.com
+#   version: v1
+#   kind: Foo
+#   package: "whatevergroup.com/whatever/v1"
+#   genDeepCopy: true
+# - group: whatevergroup.com
+#   version: v1
+#   kind: Bar
+#   package: "whatevergroup.com/whatever/v1beta1"
+#   customHandlers:
+#   - Update
+#   - Delete
 
-# # example3: control external resources from third-party projects
+# # example4: control external resources from third-party projects
 # resources:
 # - group: database.spotahome.com
 #   version: v1
 #   kind: RedisFailover
 #   package: github.com/spotahome/redis-operator/api/redisfailover/v1
 
-# resources: []
+# # example5: control resources on older k8s versions
+# resources:
+# - kind: CronJob # pay attention to the capitalization of "J"
+#   version: v1beta1
+# - kind: Job
+#   version: v1

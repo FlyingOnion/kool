@@ -70,7 +70,7 @@ func createOrUpdateCustom(customTmpl *template.Template, config *Controller) {
 
 	log.Debug(fp + " already exists")
 	log.Info("try to add new codes ...")
-	log.Info("(kool-gen will not rewrite existing codes)")
+	log.Info("(koolbuilder will not rewrite existing codes)")
 
 	f1, err := os.Open(fp)
 	if err != nil {
@@ -185,34 +185,34 @@ func createOrRewrite(tmpl *template.Template, config *Controller) {
 	}
 }
 
-// func createOrRewriteDeepCopy(tmpl *template.Template, config *Controller) error {
-// 	for i := range config.Resources {
-// 		if !config.Resources[i].GenDeepCopy {
-// 			continue
-// 		}
+func createOrRewriteDeepCopy(tmpl *template.Template, config *Controller) error {
+	for i := range config.Resources {
+		if !config.Resources[i].GenDeepCopy {
+			continue
+		}
 
-// 		var fp string
-// 		if len(config.Resources[i].Package) == 0 {
-// 			fp = filepath.Join(config.Base, config.Resources[i].LowerKind+"_kool-gen.deepcopy.go")
-// 		} else {
-// 			// filepath = basedir + (package - gomodule)
-// 			relativePath, err := filepath.Rel(config.GoConfig.Module, config.Resources[i].Package)
-// 			if err != nil {
-// 				return err
-// 			}
-// 			fp = filepath.Join(config.Base, relativePath, config.Resources[i].LowerKind+"_kool-gen.deepcopy.go")
-// 		}
-// 		log.Info("write deepcopy of", config.Resources[i].Kind, "to", fp)
+		var fp string
+		if len(config.Resources[i].Package) == 0 {
+			fp = filepath.Join(config.Base, config.Resources[i].LowerKind+"_gen.deepcopy.go")
+		} else {
+			// filepath = basedir + (package - gomodule)
+			relativePath, err := filepath.Rel(config.Go.Module, config.Resources[i].Package)
+			if err != nil {
+				return err
+			}
+			fp = filepath.Join(config.Base, relativePath, config.Resources[i].LowerKind+"_gen.deepcopy.go")
+		}
+		log.Info("write deepcopy of", config.Resources[i].Kind, "to", fp)
 
-// 		f, err := os.Create(fp)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		tmpl.Execute(f, &(config.Resources[i]))
-// 		f.Close()
-// 	}
-// 	return nil
-// }
+		f, err := os.Create(fp)
+		if err != nil {
+			return err
+		}
+		tmpl.Execute(f, &(config.Resources[i]))
+		f.Close()
+	}
+	return nil
+}
 
 func readConfig(filepath string) *Controller {
 	yamlFile, err := os.Open(filepath)

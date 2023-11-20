@@ -185,7 +185,7 @@ func createOrRewrite(tmpl *template.Template, config *Controller) {
 	}
 }
 
-func createOrRewriteDeepCopy(tmpl *template.Template, config *Controller) error {
+func createOrRewriteDeepCopy(tmpl *template.Template, config *Controller) {
 	for i := range config.Resources {
 		if !config.Resources[i].GenDeepCopy {
 			continue
@@ -198,7 +198,7 @@ func createOrRewriteDeepCopy(tmpl *template.Template, config *Controller) error 
 			// filepath = basedir + (package - gomodule)
 			relativePath, err := filepath.Rel(config.Go.Module, config.Resources[i].Package)
 			if err != nil {
-				return err
+				log.Fatal("failed to get relative path", "module", config.Go.Module, "package", config.Resources[i].Package, "cause", err)
 			}
 			fp = filepath.Join(config.Base, relativePath, config.Resources[i].LowerKind+"_gen.deepcopy.go")
 		}
@@ -206,12 +206,11 @@ func createOrRewriteDeepCopy(tmpl *template.Template, config *Controller) error 
 
 		f, err := os.Create(fp)
 		if err != nil {
-			return err
+			log.Fatal("failed to create file", "file", fp, "cause", err)
 		}
 		tmpl.Execute(f, &(config.Resources[i]))
 		f.Close()
 	}
-	return nil
 }
 
 func readConfig(filepath string) *Controller {
@@ -241,7 +240,7 @@ func main() {
 	log.Info("initializing custom methods")
 	createOrUpdateCustom(tmplCustom, config)
 
-	// log.Info("generating deepcopy methods")
-	// createOrRewriteDeepCopy(tmplDeepCopy, config)
+	log.Info("generating deepcopy methods")
+	createOrRewriteDeepCopy(tmplDeepCopy, config)
 	log.Info("done")
 }

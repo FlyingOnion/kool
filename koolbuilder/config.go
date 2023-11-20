@@ -68,13 +68,13 @@ type Resource struct {
 	// Alias   string
 
 	CustomHandlers []string `yaml:"customHandlers"`
+	GenDeepCopy    bool     `yaml:"genDeepCopy"`
 
 	LowerKind    string `yaml:"-"`
 	GoType       string `yaml:"-" yaml:"-"`
 	CustomAdd    bool   `yaml:"-"`
 	CustomUpdate bool   `yaml:"-"`
 	CustomDelete bool   `yaml:"-"`
-	GenDeepCopy  bool   `yaml:"-"`
 }
 
 type Import struct {
@@ -159,19 +159,29 @@ func (c *Controller) initAndValidate() {
 		c.Resources[i].CustomUpdate = i == 0 || len(c.Resources[i].CustomHandlers) == 0 || slices.Contains(c.Resources[i].CustomHandlers, "Update")
 		c.Resources[i].CustomDelete = i == 0 || len(c.Resources[i].CustomHandlers) == 0 || slices.Contains(c.Resources[i].CustomHandlers, "Delete")
 
-		if len(c.Resources[i].Group) == 0 {
-			initAndValidateBuiltinResource(&(c.Resources[i]), imports)
-			if c.Resources[i].GenDeepCopy {
-				log.Info(msgNoNeedToGenDeepCopy, "kind", c.Resources[i].Kind)
-				c.Resources[i].GenDeepCopy = false
-			}
+		// init group, version and package
+		initGVP(&(c.Resources[i]))
+
+		// init go type and add import
+		if len(c.Resources[i].Group) > 0 && len(c.Resources[i].Package) == 0 {
+			c.Resources[i].GoType = c.Resources[i].Kind
 		} else {
-			initAndValidateThirdPartyResource(&(c.Resources[i]), imports)
-			if c.Resources[i].GenDeepCopy && len(c.Resources[i].Package) > 0 && !strings.HasPrefix(c.Resources[i].Package, c.Go.Module) {
-				// non-local third-party resource should not generate DeepCopy
-				log.Fatal(msgConfigInvalid,
-					"cause", msgShouldNotGenDeepCopy)
-			}
+			alias := getAlias(c.Resources[i].Package)
+			c.Resources[i].GoType = alias + "." + c.Resources[i].Kind
+			imports.Insert(Import{Alias: alias, Pkg: c.Resources[i].Package})
+		}
+
+		switch {
+		case len(c.Resources[i].Group) == 0 &&
+			c.Resources[i].GenDeepCopy:
+			log.Info(msgNoNeedToGenDeepCopy, "kind", c.Resources[i].Kind)
+			c.Resources[i].GenDeepCopy = false
+		case len(c.Resources[i].Group) > 0 &&
+			c.Resources[i].GenDeepCopy &&
+			len(c.Resources[i].Package) > 0 &&
+			!strings.HasPrefix(c.Resources[i].Package, c.Go.Module):
+			log.Info(msgShouldNotGenDeepCopy, "kind", c.Resources[i].Kind)
+			c.Resources[i].GenDeepCopy = false
 		}
 	}
 	importList := imports.UnsortedList()
@@ -200,7 +210,7 @@ func getVersionFromPackage(pkg string) (string, bool) {
 	return "v1", false
 }
 
-func initAndValidateThirdPartyResource(r *Resource, imports sets.Set[Import]) {
+func initGVPLocalAndThirdParty(r *Resource) {
 	if isK8sBuiltinGroup(r.Group) {
 		log.Fatal(msgConfigInvalid,
 			"cause", msgInvalidThirdPartyGroup,
@@ -214,32 +224,14 @@ func initAndValidateThirdPartyResource(r *Resource, imports sets.Set[Import]) {
 		log.Warn(msgNoVersionInPackage, "package", r.Package)
 		log.Warn(msgIncompatibility)
 		r.Version = version
-		return
-	}
-	// version found but inconsistent
-	if version != r.Version {
+	} else if version != r.Version {
 		log.Warn(msgInconsistentVersion, "package version", version, "resource version", r.Version)
 		log.Warn(msgIncompatibility)
 	}
 
-	// check if resource is defined in the same package
-	if len(r.Package) == 0 {
-		// g > 0 && p == 0 => local import
-		// no need to import
-		r.GoType = r.Kind
-		return
-	}
-
-	alias := getAlias(r.Package)
-	r.GoType = alias + "." + r.Kind
-	imports.Insert(Import{Alias: alias, Pkg: r.Package})
-
-	if r.GenDeepCopy && !strings.HasPrefix(r.Package) {
-
-	}
 }
 
-func initAndValidateBuiltinResource(r *Resource, imports sets.Set[Import]) {
+func initGVPBuiltin(r *Resource) {
 	pkgGroup, ok := kind2Group(r.Kind)
 	if !ok && len(r.Package) == 0 {
 		log.Fatal(
@@ -271,7 +263,12 @@ func initAndValidateBuiltinResource(r *Resource, imports sets.Set[Import]) {
 			log.Warn(msgIncompatibility)
 		}
 	}
-	alias := getAlias(r.Package)
-	r.GoType = alias + "." + r.Kind
-	imports.Insert(Import{Alias: alias, Pkg: r.Package})
+}
+
+func initGVP(r *Resource) {
+	if len(r.Group) == 0 {
+		initGVPBuiltin(r)
+		return
+	}
+	initGVPLocalAndThirdParty(r)
 }

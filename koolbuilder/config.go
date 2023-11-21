@@ -73,10 +73,12 @@ type Resource struct {
 	GenDeepCopy    bool     `yaml:"genDeepCopy"`
 
 	LowerKind    string `yaml:"-"`
-	GoType       string `yaml:"-" yaml:"-"`
+	GoType       string `yaml:"-"`
 	CustomAdd    bool   `yaml:"-"`
 	CustomUpdate bool   `yaml:"-"`
 	CustomDelete bool   `yaml:"-"`
+
+	ShouldRegister bool `yaml:"-"`
 }
 
 type Import struct {
@@ -109,7 +111,7 @@ const (
 const (
 	defaultName          = "Controller"
 	defaultGoVersion     = "1.21.1"
-	defaultK8sAPIVersion = "0.28.2"
+	defaultK8sAPIVersion = "0.28.3"
 )
 
 func defaultController() *Controller {
@@ -174,7 +176,7 @@ func (c *Controller) initAndValidate() {
 		initGVP(&(c.Resources[i]))
 
 		// init go type and add import
-		if len(c.Resources[i].Group) > 0 && len(c.Resources[i].Package) == 0 {
+		if len(c.Resources[i].Group) > 0 && (len(c.Resources[i].Package) == 0 || c.Resources[i].Package == c.Go.Module) {
 			c.Resources[i].GoType = c.Resources[i].Kind
 		} else {
 			alias := getAlias(c.Resources[i].Package)
@@ -194,6 +196,8 @@ func (c *Controller) initAndValidate() {
 			log.Info(msgShouldNotGenDeepCopy, "kind", c.Resources[i].Kind)
 			c.Resources[i].GenDeepCopy = false
 		}
+
+		c.Resources[i].ShouldRegister = len(c.Resources[i].Group) > 0
 	}
 	importList := imports.UnsortedList()
 	sort.Sort(ImportList(importList))
@@ -229,17 +233,17 @@ func initGVPLocalAndThirdParty(r *Resource) {
 			"tip", msgInvalidThirdPartyGroupTip,
 		)
 	}
-
+	emptyVersion := len(r.Version) == 0
 	version, found := getVersionFromPackage(r.Package)
-	if !found {
+	switch {
+	case emptyVersion && !found:
 		log.Warn(msgNoVersionInPackage, "package", r.Package)
 		log.Warn(msgIncompatibility)
 		r.Version = version
-	} else if version != r.Version {
+	case !emptyVersion && found && version != r.Version:
 		log.Warn(msgInconsistentVersion, "package version", version, "resource version", r.Version)
 		log.Warn(msgIncompatibility)
 	}
-
 }
 
 func initGVPBuiltin(r *Resource) {
@@ -258,6 +262,8 @@ func initGVPBuiltin(r *Resource) {
 	case emptyVersion && emptyPackage:
 		r.Version = "v1"
 		r.Package = "k8s.io/api/" + pkgGroup + "/v1"
+	case emptyPackage:
+		r.Package = "k8s.io/api/" + pkgGroup + "/" + r.Version
 	case emptyVersion:
 		version, found := getVersionFromPackage(r.Package)
 		if !found {
@@ -265,8 +271,6 @@ func initGVPBuiltin(r *Resource) {
 			log.Warn(msgIncompatibility)
 		}
 		r.Version = version
-	case emptyPackage:
-		r.Package = "k8s.io/api/" + pkgGroup + "/" + r.Version
 	default:
 		version, found := getVersionFromPackage(r.Package)
 		if found && version != r.Version {

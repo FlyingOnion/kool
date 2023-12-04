@@ -1,28 +1,39 @@
+# kool
 
+kool is a helper library for creating k8s operators.
+
+## What's new
+
+We use generics! No more `FooInformer`, `BarInformer` or `BazInformer`, just use `kool.Informer`!
+
+So as `Lister` and `Client`.
 
 ```go
-import "k8s.io/client-go/rest"
-import "k8s.io/client-go/tools/clientcmd"
+// Using code-generator or kubebuilder:
 
-// 1. get an REST client
+var fooInformer FooInformer
+var barInformer BarInformer
+var bazInformer BazInformer
 
-// 1.1 get an REST config
+// Using kool:
 
-// use default InclusterConfig
-config := rest.InclusterConfig()
+import "github.com/FlyingOnion/kool"
 
-// or parse a config using kubeconfig file path and master url
-var kubeconfig string
-var master string
-config := clientcmd.BuildConfigFromFlags(master, kubeconfig)
+var fooInformer kool.Informer[Foo]
+var barInformer kool.Informer[Bar]
+var bazInformer kool.Informer[Baz]
+```
 
-// 1.2 get an http client, and construct a REST client
+## How to use
 
-client, err := rest.RESTClientFor(config) (*RESTClient, error)
+We suggest using [koolbuilder](https://flyingonion.github.io/koolbuilder/index.html) to build your operator boilerplate. You don't need to install any code generator binaries.
 
-// or
-httpClient, err := rest.HTTPClientFor(config)
-client, err := rest.RESTClientForConfigAndClient(config, httpClient)
+GitHub Page
 
-// 2. 
+https://flyingonion.github.io/koolbuilder/index.html
+
+Or command line
+
+```bash
+go get github.com/FlyingOnion/koolbuilder
 ```

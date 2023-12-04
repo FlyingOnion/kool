@@ -1,9 +1,0 @@
-module {{ .Go.Module }}
-
-go {{ .Go.Version }}
-
-require (
-	k8s.io/api v{{ .Go.K8sAPIVersion }}
-	k8s.io/apimachinery v{{ .Go.K8sAPIVersion }}
-	k8s.io/client-go v{{ .Go.K8sAPIVersion }}
-)

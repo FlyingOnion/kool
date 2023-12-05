@@ -1,6 +1,6 @@
-# kool
+# Kool
 
-kool is a helper library for creating k8s operators.
+Kool is a helper library for creating k8s operators.
 
 ## What's new
 

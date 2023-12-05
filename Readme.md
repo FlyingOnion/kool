@@ -26,13 +26,15 @@ var bazInformer kool.Informer[Baz]
 
 ## How to use
 
-We suggest using [koolbuilder](https://flyingonion.github.io/koolbuilder/index.html) to build your operator boilerplate. You don't need to install any code generator binaries.
+We provide [koolbuilder](https://github.com/FlyingOnion/koolbuilder) to generate operator boilerplate. You don't need to install any code generator binaries.
 
-GitHub Page
+Choose one of the following links:
 
-https://flyingonion.github.io/koolbuilder/index.html
+Cloudflare Pages https://koolbuilder.pages.dev (China-mainland-friendly)
 
-Or command line
+GitHub Pages https://flyingonion.github.io/koolbuilder/index.html
+
+Or use command line (for updating your operator):
 
 ```bash
 go get github.com/FlyingOnion/koolbuilder

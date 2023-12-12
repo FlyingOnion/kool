@@ -2,10 +2,12 @@ package kool
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/rest"
@@ -28,6 +30,19 @@ type ClientWithApply[T, ApplyConfiguration any] interface {
 	Client[T]
 	Apply(ctx context.Context, ac *ApplyConfiguration, opts metav1.ApplyOptions) (result *T, err error)
 	ApplyStatus(ctx context.Context, ac *ApplyConfiguration, opts metav1.ApplyOptions) (result *T, err error)
+}
+
+// NewRESTClient creates a new RESTClient for the given config.
+// This client can only be used to interact with the given group version.
+func NewRESTClient(config *rest.Config, httpClient *http.Client, gv *schema.GroupVersion) (*rest.RESTClient, error) {
+	configCopy := *config
+	configCopy.GroupVersion = gv
+	configCopy.APIPath = "/apis"
+	configCopy.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+	if configCopy.UserAgent == "" {
+		configCopy.UserAgent = rest.DefaultKubernetesUserAgent()
+	}
+	return rest.RESTClientForConfigAndClient(&configCopy, httpClient)
 }
 
 type restClient[T any] struct {

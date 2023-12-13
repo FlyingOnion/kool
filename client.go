@@ -38,6 +38,10 @@ func NewRESTClient(config *rest.Config, httpClient *http.Client, gv *schema.Grou
 	configCopy := *config
 	configCopy.GroupVersion = gv
 	configCopy.APIPath = "/apis"
+	if len(gv.Group) == 0 {
+		// don't ask me why this is different from other groups
+		configCopy.APIPath = "/api"
+	}
 	configCopy.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 	if configCopy.UserAgent == "" {
 		configCopy.UserAgent = rest.DefaultKubernetesUserAgent()
